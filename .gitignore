@@ -1,0 +1,6 @@
+.env
+backend/static/audio/
+__pycache__/
+node_modules/
+.venv/
+*.pyc
