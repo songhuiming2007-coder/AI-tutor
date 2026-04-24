@@ -1,7 +1,7 @@
 import os
 import asyncio
+import base64
 import logging
-from pathlib import Path
 
 import certifi
 os.environ["SSL_CERT_FILE"] = certifi.where()
@@ -18,10 +18,6 @@ dashscope.api_key = settings.DASHSCOPE_API_KEY
 
 
 class TTSService:
-    def __init__(self):
-        self.audio_dir = settings.STATIC_DIR / "audio"
-        self.audio_dir.mkdir(parents=True, exist_ok=True)
-
     def _call_tts(self, script: str) -> bytes:
         """同步调用百炼 TTS API - 每次新建实例"""
         synthesizer = SpeechSynthesizer(
@@ -32,26 +28,18 @@ class TTSService:
         return audio
 
     async def _generate_one(self, lesson_id: str, index: int, script: str) -> str:
-        filename = f"{lesson_id}_slide_{index}.mp3"
-        filepath = self.audio_dir / filename
-        audio_url = f"/static/audio/{filename}"
-
+        """生成音频并返回 base64 data URL（不写磁盘）"""
         try:
             audio_data = await asyncio.to_thread(self._call_tts, script)
-            filepath.write_bytes(audio_data)
-
-            assert filepath.exists(), f"音频文件不存在: {filepath}"
-            assert filepath.stat().st_size > 0, f"音频文件为空: {filepath}"
-
-            logger.info(f"生成音频成功: {filename} ({filepath.stat().st_size} bytes)")
-            return audio_url
-
+            b64 = base64.b64encode(audio_data).decode("utf-8")
+            data_url = f"data:audio/mp3;base64,{b64}"
+            logger.info(f"生成音频成功: lesson={lesson_id} slide_{index} ({len(audio_data)} bytes)")
+            return data_url
         except Exception as e:
-            logger.error(f"生成音频失败 {filename}: {e}")
+            logger.error(f"生成音频失败 lesson={lesson_id} slide_{index}: {e}")
             raise
 
     async def generate_all(self, lesson_id: str, slides: list) -> list[str]:
-        # 串行调用，避免 WebSocket 并发冲突
         results = []
         for slide in slides:
             url = await self._generate_one(lesson_id, slide.index, slide.narration)

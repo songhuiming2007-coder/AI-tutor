@@ -19,7 +19,6 @@ router = APIRouter()
 async def generate_lesson(request: GenerateRequest):
     lesson_id = uuid4().hex[:8]
 
-    # 调用 LLM 生成幻灯片
     try:
         slides = await llm_service.generate_slides(
             request.topic, request.language
@@ -29,7 +28,6 @@ async def generate_lesson(request: GenerateRequest):
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"LLM 调用失败: {str(e)}")
 
-    # 调用 TTS 生成音频
     try:
         audio_urls = await tts_service.generate_all(lesson_id, slides)
         for slide, audio_url in zip(slides, audio_urls):
@@ -64,11 +62,14 @@ async def generate_stream(topic: str = Query(..., min_length=1)):
 
         # ---- 上半部分 TTS ----
         try:
-            urls = await tts_service.generate_concurrent(lesson_id, upper_slides)
-            for slide, url in zip(upper_slides, urls):
-                if url:
-                    slide.audio_url = url
-                    yield {"event": "audio", "data": json.dumps({"index": slide.index, "audio_url": url})}
+            audio_data_urls = await tts_service.generate_concurrent(lesson_id, upper_slides)
+            for slide, data_url in zip(upper_slides, audio_data_urls):
+                if data_url:
+                    slide.audio_url = data_url
+                    yield {"event": "audio", "data": json.dumps({
+                        "index": slide.index,
+                        "audio_url": data_url,
+                    })}
         except Exception as e:
             logger.error(f"上半部分 TTS 失败: {e}")
 
@@ -88,11 +89,14 @@ async def generate_stream(topic: str = Query(..., min_length=1)):
 
         # ---- 下半部分 TTS ----
         try:
-            urls = await tts_service.generate_concurrent(lesson_id, lower_slides)
-            for slide, url in zip(lower_slides, urls):
-                if url:
-                    slide.audio_url = url
-                    yield {"event": "audio", "data": json.dumps({"index": slide.index, "audio_url": url})}
+            audio_data_urls = await tts_service.generate_concurrent(lesson_id, lower_slides)
+            for slide, data_url in zip(lower_slides, audio_data_urls):
+                if data_url:
+                    slide.audio_url = data_url
+                    yield {"event": "audio", "data": json.dumps({
+                        "index": slide.index,
+                        "audio_url": data_url,
+                    })}
         except Exception as e:
             logger.error(f"下半部分 TTS 失败: {e}")
 

@@ -102,9 +102,9 @@ export default function App() {
 
     es.addEventListener('audio', (e) => {
       const data = JSON.parse(e.data)
-      const audioUrl = `${API_BASE}${data.audio_url}`
+      // audio_url 现在是 base64 data URL，直接使用
       setSlides(prev => prev.map(s =>
-        s.index === data.index ? { ...s, audio_url: audioUrl } : s
+        s.index === data.index ? { ...s, audio_url: data.audio_url } : s
       ))
     })
 

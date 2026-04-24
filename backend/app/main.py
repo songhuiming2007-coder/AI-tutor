@@ -1,13 +1,9 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .api.router import router
-
-# 确保 static 目录存在（StaticFiles 挂载时需要）
-settings.STATIC_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @asynccontextmanager
@@ -24,5 +20,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.mount("/static", StaticFiles(directory=settings.STATIC_DIR), name="static")
 app.include_router(router)
+
+# 静态文件挂载（本地开发用，Vercel 环境跳过）
+try:
+    from fastapi.staticfiles import StaticFiles
+    settings.STATIC_DIR.mkdir(parents=True, exist_ok=True)
+    app.mount("/static", StaticFiles(directory=settings.STATIC_DIR), name="static")
+except Exception:
+    pass
